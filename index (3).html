@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>إفيه على الموقف</title>
+<meta name="theme-color" content="#10302d">
+<meta property="og:title" content="إفيه على الموقف">
+<meta property="og:description" content="الموقف على الترابيزة.. نزّل أنسب إفيه عندك">
+<script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lalezar&family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: one phone-first column — a 60s Cairo cinema poster: teal wall, brick-red situation card, cream answer cards, mustard marquee. Single deliberate look in both host themes. */
+:root{
+  --wall:#10302d; --wall-2:#16403c; --wall-line:#2a5a54;
+  --brick:#a8321f; --brick-ink:#fbecc9;
+  --paper:#f3e6c4; --paper-ink:#2b1a10; --paper-edge:#d8c79c;
+  --mustard:#e8b13a; --mustard-ink:#2b1a10;
+  --cream:#f6ecd4; --muted:#a9c4bd;
+  --good:#7fd1a2;
+  --f-display:"Lalezar","IBM Plex Sans Arabic",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans Arabic","Segoe UI",Tahoma,system-ui,sans-serif;
+  color-scheme:dark;
+}
+html,body{background:var(--wall);color:var(--cream)}
+body{font-family:var(--f-body);font-size:16px;line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:16px 120px;
+  background-image:repeating-linear-gradient(90deg,transparent 0 46px,rgba(255,255,255,.025) 46px 47px);}
+#app{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+h1,h2,.display{font-family:var(--f-display);font-weight:400;letter-spacing:0;text-wrap:balance;margin:0}
+button{font:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,.card:focus-visible{outline:3px solid var(--mustard);outline-offset:3px}
+
+/* marquee title */
+.marquee{text-align:center;display:flex;flex-direction:column;gap:6px;padding-block:18px 4px}
+.marquee h1{font-size:clamp(44px,13vw,72px);line-height:1.05;color:var(--mustard);
+  text-shadow:0 3px 0 var(--brick),0 6px 0 rgba(0,0,0,.35)}
+.marquee p{margin:0;color:var(--muted);font-size:15px}
+.bulbs{display:flex;justify-content:center;gap:10px}
+.bulbs i{width:7px;height:7px;border-radius:50%;background:var(--mustard);opacity:.35;animation:blink 1.6s infinite}
+.bulbs i:nth-child(2n){animation-delay:.8s}
+@keyframes blink{50%{opacity:1;box-shadow:0 0 8px var(--mustard)}}
+
+.panel{background:var(--wall-2);border:1px solid var(--wall-line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:14px}
+label{font-weight:600;font-size:14px;color:var(--muted)}
+input{font:inherit;font-size:18px;width:100%;box-sizing:border-box;padding:12px 14px;border-radius:10px;border:2px solid var(--wall-line);background:var(--wall);color:var(--cream)}
+input::placeholder{color:#6f8e88}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row>*{flex:1 1 140px;min-width:0}
+.btn{border:0;border-radius:12px;padding:14px 18px;font-weight:700;font-size:17px;background:var(--mustard);color:var(--mustard-ink);box-shadow:0 4px 0 #9c7419}
+.btn:active{transform:translateY(2px);box-shadow:0 2px 0 #9c7419}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--cream);border:2px solid var(--wall-line);box-shadow:none}
+.btn.small{padding:8px 12px;font-size:14px}
+.or{text-align:center;color:var(--muted);font-size:13px}
+.note{font-size:14px;color:var(--muted);margin:0}
+.warn{background:#3a2a12;border:1px solid #7a5a1f;color:#f3d48a;border-radius:12px;padding:12px 14px;font-size:14px}
+
+/* game header */
+.top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.code{display:flex;align-items:center;gap:8px;background:var(--wall-2);border:1px dashed var(--mustard);border-radius:10px;padding:6px 10px}
+.code b{font-family:var(--f-display);font-size:24px;letter-spacing:4px;color:var(--mustard);direction:ltr}
+.code span{font-size:12px;color:var(--muted)}
+.meta{font-size:13px;color:var(--muted);display:flex;gap:10px;align-items:center}
+.pill{background:var(--wall-2);border:1px solid var(--wall-line);border-radius:999px;padding:3px 10px;font-size:13px;color:var(--cream)}
+
+/* cards */
+.prompt{background:var(--brick);color:var(--brick-ink);border-radius:16px;padding:22px 20px 18px;box-shadow:0 8px 0 rgba(0,0,0,.28);position:relative}
+.prompt .tag{font-size:12px;letter-spacing:.06em;opacity:.8}
+.prompt .display{font-size:clamp(26px,7vw,34px);line-height:1.35;margin-top:6px}
+.prompt .tick{position:absolute;inset:auto 14px 10px auto;font-size:11px;opacity:.6;font-variant-numeric:tabular-nums}
+.hand{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.card{background:var(--paper);color:var(--paper-ink);border:0;border-bottom:4px solid var(--paper-edge);border-radius:12px;padding:14px 12px;min-height:96px;
+  text-align:start;font-weight:700;font-size:17px;line-height:1.45;display:flex;flex-direction:column;justify-content:space-between;gap:8px;transition:transform .12s}
+.card small{font-weight:600;font-size:12px;opacity:.6}
+.card.sel{background:var(--mustard);border-bottom-color:#9c7419;transform:translateY(-4px) rotate(-1deg)}
+.card.mine{opacity:.55;cursor:default}
+.card.win{background:var(--mustard);box-shadow:0 0 0 3px var(--cream)}
+.card .who{font-size:13px;font-weight:600;opacity:.75}
+.votes{font-family:var(--f-display);font-size:20px;color:var(--brick)}
+.status{text-align:center;font-weight:600;color:var(--muted)}
+.status.big{font-family:var(--f-display);font-weight:400;font-size:28px;color:var(--mustard)}
+.dock{position:fixed;inset:auto 0 0 0;padding:12px max(16px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
+  background:linear-gradient(transparent,var(--wall) 30%);display:flex;justify-content:center;z-index:5}
+.dock .btn{width:100%;max-width:560px}
+
+/* lobby + scores */
+.players{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.players li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:var(--wall)}
+.players .nm{font-weight:700;min-width:0;overflow-wrap:anywhere}
+.players .sc{font-family:var(--f-display);font-size:22px;color:var(--mustard);font-variant-numeric:tabular-nums}
+.badge{font-size:11px;padding:2px 8px;border-radius:999px;background:var(--brick);color:var(--brick-ink);margin-inline-start:6px;white-space:nowrap}
+.badge.you{background:var(--wall-line);color:var(--cream)}
+.seg{display:flex;background:var(--wall);border-radius:10px;padding:4px;gap:4px}
+.seg button{flex:1;border:0;border-radius:8px;padding:10px 6px;background:transparent;color:var(--muted);font-weight:700;font-size:14px}
+.seg button.on{background:var(--mustard);color:var(--mustard-ink)}
+.champ{text-align:center;display:flex;flex-direction:column;gap:6px;padding-block:10px}
+.champ .display{font-size:44px;color:var(--mustard)}
+.spinner{width:28px;height:28px;border:3px solid var(--wall-line);border-top-color:var(--mustard);border-radius:50%;margin:20px auto;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.toast{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);background:var(--cream);color:var(--paper-ink);padding:8px 16px;border-radius:999px;font-weight:700;z-index:20}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+html{padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;-webkit-text-size-adjust:100%}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+
+<div id="app" dir="rtl" lang="ar"></div>
+<div id="dock" class="dock" dir="rtl" hidden></div>
+<div id="toast" class="toast" dir="rtl" hidden></div>
+
+<script>
+document.documentElement.dir="rtl";document.documentElement.lang="ar";
+
+/* ===== الكروت ===== */
+const PROMPTS=[
+"لما مامتك تشوف النتيجة قبلك","أول ما المدير يقولك: «تعالى عايزك»","لما صاحبك يقولك «أنا في الطريق» وهو لسه نايم",
+"لما الدليفري يتأخر ساعتين","لما عمتك تسألك في الفرح: «عقبالك؟»","لما الكهربا تقطع قبل ما تحفظ الشغل",
+"لما تكتشف إن أهلك في الجروب","لما الميكروباص يقف في نص الطريق ويقول «آخره هنا»","لما حد يستلف منك ويختفي",
+"أول يوم في الجيم","لما المدرس يقول «امتحان مفاجئ»","لما تبعت رسالة للشخص الغلط",
+"لما الكاشير يقولك «معاكش فكة؟»","لما تصحى متأخر يوم الامتحان","لما حماتك تيجي من غير ما تقول",
+"لما النت يفصل في الدقيقة 90","لما تقابل الإكس في السوبر ماركت","لما أبوك يمسك الريموت",
+"لما الموظف يقولك «فوت علينا بكرة»","لما تسمع صوت الشبشب جاي ناحيتك","لما تكتشف إن الامتحان النهارده مش بكرة",
+"لما حد يقولك «عايزك في كلمة على جنب»","لما تلاقي فلوس في بنطلون قديم","لما ييجي العيد ومحدش يديك عيدية",
+"لما تشوف فاتورة الكهربا","أول جملة بتقولها الصبح","لما الدكتور يقولك «بطّل أكل»",
+"لما تنزل من البيت وتنسى الموبايل","لما تتصور صورة جماعية وعينك مقفولة","لما صاحبك يحكيلك حلمه بالتفصيل",
+"لما تسأل حد «مالك؟» ويقولك «مفيش حاجة»","لما حد يعمل لايك على صورتك من 2014","لما التكييف يبوظ في أغسطس",
+"لما الكابتن يلف ربع ساعة حوالين البيت","لما تتأخر على الشغل والمدير معاك في الأسانسير","لما الباقة تخلص في نص الشهر",
+"لما تروح فرح ومتعرفش حد","لما ابن الجيران يخلص طب","لما ماما تقول «هنعدي على خالتك خمس دقايق»",
+"لما المدرس يقولك «قول اللي قلته للفصل كله»","لما تقرر تبدأ الدايت النهارده","لما حد يقولك «مش عايز أزعلك بس...»",
+"لما الأسانسير يقف بيك","لما صاحبك يقولك «تعالى نعمل بيزنس»","أيام الكورونا لما حد يعطس جنبك",
+"لما يضيفوك في جروب العيلة","لما تقف في طابور البنك ساعة والشباك يقفل","لما ابن أختك يمسك موبايلك",
+"لما تعزم حد وتتمنى يقول لأ","لما الحلاق يقولك «سيبها عليا»","لما رقم غريب يتصل بيك 3 الفجر",
+"لما تطلب «زي ما هو» والطلب ييجي غلط","وصف حياتك في جملة واحدة","لما تكسب في اللعبة دي",
+"لما حد يقولك «إنت اتغيرت»","لما تلاقي الجوابات في الكيس غلط في السوق","لما تتصل بخدمة العملاء",
+"لما تفتح التلاجة للمرة العاشرة ومفيش جديد","أول يوم أجازة بعد الامتحانات","لما ماما تقول «الأكل جاهز» وهو مش جاهز",
+"لما مراتك تقولك «اعمل اللي إنت عايزه»","لما صاحبك يصورك وإنت بتاكل","لما تشوف الإيجار الجديد",
+"لما الواد في الفصل يفكّر المدرس بالواجب","لما حد يرد على رسالتك بـ «ك»","رد فعلك لما حد يقولك «إنت شبه فلان»"
+];
+const ANSWERS=[
+"إنت عارف إنت بتكلم مين؟","ماشي يا عم الحج","هي دي مصر يا عبلة","مرسي الزناتي اتهزم يا رجالة","بلد شهادات صحيح",
+"عندي شعرة.. ساعة تروح وساعة تيجي","إنسى يا عمرو","مفيش فايدة","يا نهار أبيض!","يا نهار مش فايت",
+"في المشمش","خليها على الله","حسبي الله ونعم الوكيل","أنا مش هنا","طب وأنا مالي؟",
+"هو فيه إيه؟!","ده كلام برضه؟","يا فرحة ما تمت","فين أيامك يا زمن","اللي فات مات",
+"اختفي من وشي","عيش عيشة أهلك","الحق عليا أنا","ما تسيبونيش لوحدي","كله إلا كده",
+"اللي اختشوا ماتوا","قول يا باسط","يا جدعان أنا تعبت","إيه الحلاوة دي؟","عايز أروّح",
+"ركّز معايا","الواد ده شكله مش مظبوط","بقولك إيه.. اسمعني بس","مفيش حاجة اسمها مستحيل","واحد شاي في الخمسينة",
+"فرحتيني يا شيخة","عادي يعني","سيبك إنت","حرام عليك","الصبر جميل",
+"يا مسهّل","خد بالك من نفسك","تعالى بكرة","السيستم واقع","فوت علينا بكرة",
+"معاك فكة؟","الباقي عليك يا باشا","النت فصل","الشحن خلص","ماما بتقولك تعالى",
+"خلّيك في حالك","لما أشوف","حاضر يا ماما","إنت لسه صاحي؟","هتتجوز إمتى؟",
+"جبت كام في الثانوية؟","ده ابن خالتك؟ ده كبر!","خمسة وخميسة","عين الحسود فيها عود","حصل خير",
+"أنا في الطريق","خمس دقايق وأكون عندك","على الله حكايتك","أنا هقول لبابا","إحنا بتوع الأتوبيس",
+"العيال كبرت","فيه حاجة غلط","ده أنا غلبان","ابعد عني يا شيطان","ما تيجي نتكلم بالعقل",
+"اديني عقلك","جيب من الآخر","الدنيا حر موت","الولد ده عبقري","خليك راجل",
+"متكسفنيش","يا ستير يا رب","بقالي ساعة مستنيك","ده على جثتي!","أنا الكبير هنا",
+"اللي يعرفش يقول عدس","اسأل مجرب ولا تسأل حكيم","جت الحزينة تفرح ملقتلهاش مطرح","ياما في الجراب يا حاوي","بالشفا يا حبيبي",
+"اللهم إني صائم","تسلم الأيادي","ده مش فيلم هندي","إحنا اتفقنا على كده؟","هو أنا كنت بقول إيه؟",
+"إنت فاكر نفسك مين؟","يا ريتني سمعت كلام أمي","إنت بتشتغلني؟","الفيلم ده أنا شفته قبل كده","أنا بقول نمشي",
+"خليك في البيت","الكمامة فين؟","اتعقمت؟","هنفتح الشباك بعد الضهر","الأوراق ناقصة ختم النسر",
+"شوفلي حد يعرف حد","مش وقته خالص","يا حبيبي يا أخويا","تعالى نبقى صحاب","مين اللي بيتكلم؟",
+"هعمل نفسي مشفتش","ده مش بيتنا!","المهم الصحة","وطّي صوتك الجيران","هي الساعة كام؟",
+"أنا مالي ومال الناس؟","استنى أصوّر الأكل الأول","سيبني أعيط شوية","طب والعمل؟","إيه يا عم الثقة دي؟"
+];
+const HAND=7;
+
+/* ===== أدوات ===== */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const clone=o=>JSON.parse(JSON.stringify(o));
+function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const deckCache={};
+function deck(n,seed){const k=n+":"+seed;if(deckCache[k])return deckCache[k];const a=[...Array(n).keys()],r=rng(seed);for(let i=n-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return deckCache[k]=a}
+function lsGet(k){try{return localStorage.getItem(k)||""}catch(e){return""}}
+function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+function toast(t){const el=$("#toast");el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,1800)}
+function newCode(){const L="ABCDEFGHJKMNPQRSTUVWXYZ";let s="";for(let i=0;i<4;i++)s+=L[Math.floor(Math.random()*L.length)];return s}
+
+/* ===== الحالة ===== */
+const roomReady=true, roomFailed=typeof mqtt==="undefined";
+let R=null, connected=false;
+let code=null, myPeer=null, myPres={}, lastG=null, claimAt=0, sel=null, pick=null, screen="home";
+
+/* ===== الاتصال (سيرفر MQTT عام ومجاني، من غير حسابات) ===== */
+const BROKER="wss://broker.emqx.io:8084/mqtt";
+const BASE="afeh-mawqef-v1/";
+const ME=(Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2)).replace(/[^a-z0-9]/g,"").slice(0,12);
+function makeNet(c){
+  const others={}; let client=null, hb=null, pr=null, pubT=null;
+  const topic=id=>BASE+c+"/p/"+id;
+  const net={
+    peers(){ return [{peer:ME,sameTab:true,kind:"viewer",presence:myPres},...Object.values(others)] },
+    presence(){ clearTimeout(pubT); pubT=setTimeout(publish,60); return Promise.resolve() },
+    leave(){ try{ client&&client.publish(topic(ME),"",{qos:0},()=>client.end(true)) }catch(e){} clearInterval(hb); clearInterval(pr); },
+  };
+  function publish(){ if(client&&client.connected) client.publish(topic(ME),JSON.stringify(myPres),{qos:0}); }
+  client=mqtt.connect(BROKER,{clientId:"afeh_"+ME+"_"+Math.random().toString(36).slice(2,6),keepalive:30,reconnectPeriod:2000,connectTimeout:10000,clean:true,
+    will:{topic:topic(ME),payload:"",qos:0,retain:false}});
+  client.on("connect",()=>{ connected=true; if(!myPres.g) claimAt=Math.max(claimAt,Date.now()+(creatingRoom?300:4000)); client.subscribe(BASE+c+"/p/+",{qos:0}); publish(); onRoomChange(); });
+  client.on("close",()=>{ if(connected){connected=false; render();} });
+  client.on("message",(t,buf)=>{
+    const id=t.split("/").pop(); if(id===ME) return;
+    const s=buf.toString();
+    if(!s){ if(others[id]){ delete others[id]; onRoomChange(); } return; }
+    const old=others[id];
+    if(old&&old.raw===s){ old.seen=Date.now(); return; }
+    try{ const p=JSON.parse(s); others[id]={peer:id,sameTab:false,kind:"viewer",presence:Object.freeze(p),raw:s,seen:Date.now()}; onRoomChange(); }catch(e){}
+  });
+  hb=setInterval(publish,2500);
+  pr=setInterval(()=>{ let ch=false; for(const id in others){ if(Date.now()-others[id].seen>9000){ delete others[id]; ch=true; } } if(ch) onRoomChange(); },2000);
+  return net;
+}
+
+let creatingRoom=false;
+function enterRoom(c, creating){
+  creatingRoom=!!creating; code=c; screen="game"; myPres={}; lastG=null; sel=null; pick=null; myPeer=ME;
+  try{ history.replaceState(null,"","?r="+c) }catch(e){}
+  R=makeNet(c);
+  setP({k:code, n:myName(), t:Date.now()});
+  claimAt = Date.now() + (creating ? 600 : 4000);
+  try{ navigator.wakeLock?.request("screen").catch(()=>{}) }catch(e){}
+}
+function leaveRoom(){
+  try{ R&&R.leave() }catch(e){}
+  R=null; code=null; screen="home"; connected=false;
+  try{ history.replaceState(null,"",location.pathname) }catch(e){}
+  renderHome();
+}
+setInterval(()=>{ if(screen==="game"&&R){ claimCheck(); } },1200);
+function shareLink(){ return location.origin+location.pathname+"?r="+code }
+
+function onRoomChange(){
+  if(!R) return;
+  claimCheck(); hostTick(); render();
+}
+function pres(p){ return p.sameTab ? myPres : (p.presence||{}) }
+function players(){
+  if(!R) return [];
+  return R.peers().filter(p=>p.kind==="viewer"&&pres(p).k===code&&pres(p).n);
+}
+function presOf(peer){ const p=players().find(x=>x.peer===peer); return p?pres(p):null }
+function setP(patch){
+  for(const k in patch){ if(patch[k]===null) delete myPres[k]; else myPres[k]=patch[k]; }
+  if(R) R.presence(patch).catch(e=>{ if(e&&e.code==="invalid_argument") toast("البيانات كبيرة، جرّب أسماء أقصر"); });
+  hostTick(); render();
+}
+function currentG(){
+  let best=null,bp=null;
+  for(const p of players()){ const g=pres(p).g; if(!g||g.h!==p.peer) continue;
+    if(!best||g.v>best.v||(g.v===best.v&&p.peer<bp)){best=g;bp=p.peer} }
+  if(best) lastG=clone(best);
+  return best;
+}
+function isHost(){ const g=currentG(); return !!(g&&myPeer&&g.h===myPeer) }
+
+function claimCheck(){
+  if(!R||!myPeer) return;
+  const g=currentG();
+  // لو فيه أكتر من مدير، الأضعف يتنازل
+  if(myPres.g && g && g.h!==myPeer){ setP({g:null}); return; }
+  if(g) { claimAt=Date.now()+3500; return; }
+  if(Date.now()<claimAt) return;
+  const ps=players();
+  let order;
+  if(lastG&&lastG.ph!=="lobby"){ order=lastG.ord.filter(x=>ps.some(p=>p.peer===x)); ps.forEach(p=>{if(!order.includes(p.peer))order.push(p.peer)}) }
+  else order=[...ps].sort((a,b)=>(pres(a).t||0)-(pres(b).t||0)||(a.peer<b.peer?-1:1)).map(p=>p.peer);
+  if(order[0]!==myPeer){ claimAt=Date.now()+2000; return; }
+  let ng;
+  if(lastG){ ng=clone(lastG); ng.v=(ng.v||0)+1; ng.h=myPeer; }
+  else ng={v:1,h:myPeer,ph:"lobby",mode:"j",goal:5,ord:[],nm:{},sc:{}};
+  setP({g:ng});
+}
+
+/* ===== منطق المدير ===== */
+function drawCard(g){
+  const d=deck(ANSWERS.length,g.seed), used=new Set();
+  Object.values(g.hd||{}).forEach(h=>h.forEach(c=>used.add(c)));
+  (g.subs||[]).forEach(s=>used.add(s[1]));
+  for(let i=0;i<d.length;i++){ const c=d[g.dp%d.length]; g.dp++; if(!used.has(c)) return c; }
+  return d[(g.dp++)%d.length];
+}
+function deal(g,x){ g.hd[x]=[]; for(let i=0;i<HAND;i++) g.hd[x].push(drawCard(g)); }
+function nextRound(g,P){
+  for(const x of Object.keys(P)){ if(!g.ord.includes(x)){ g.ord.push(x); g.sc[x]=g.sc[x]||0; } if(!g.hd[x]) deal(g,x); }
+  g.r=(g.r||0)+1;
+  const pd=deck(PROMPTS.length,g.seed+7); g.pr=pd[g.pp%pd.length]; g.pp++;
+  g.ji=((g.ji??-1)+1)%g.ord.length; g.jd=g.mode==="j"?g.ord[g.ji]:null;
+  g.ph="play"; g.subs=[]; g.win=[]; g.tv=null;
+  const keep={}; g.ord.forEach(x=>keep[x]=g.nm[x]); g.nm=keep;
+}
+function reveal(g,P,done){
+  g.subs=done.map(x=>[x,P[x].s.c]);
+  if(g.subs.length<3) g.subs.push(["*",null]);
+  for(const [x,c] of g.subs){ if(x==="*") continue; g.hd[x]=g.hd[x].filter(k=>k!==c); }
+  for(const s of g.subs){ if(s[0]==="*") s[1]=drawCard(g); }
+  for(const [x] of g.subs){ if(x!=="*") g.hd[x].push(drawCard(g)); }
+  for(let i=g.subs.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[g.subs[i],g.subs[j]]=[g.subs[j],g.subs[i]]}
+  g.ph=g.mode==="j"?"judge":"vote";
+}
+function finishRound(g,idxs){
+  g.win=idxs;
+  idxs.forEach(i=>{ const x=g.subs[i][0]; if(x!=="*"&&x in g.sc) g.sc[x]++; });
+  g.ph=Object.values(g.sc).some(s=>s>=g.goal)?"over":"result";
+}
+function validVote(g,v,x){ return v&&v.r===g.r&&g.subs[v.i]&&g.subs[v.i][0]!==x }
+function tally(g,P){
+  const t=g.subs.map(()=>0);
+  g.ord.forEach(x=>{ const v=P[x]&&P[x].v; if(validVote(g,v,x)) t[v.i]++; });
+  const m=Math.max(...t); g.tv=t;
+  finishRound(g, m>0 ? t.map((c,i)=>c===m?i:-1).filter(i=>i>=0) : []);
+}
+function snapshotP(){ const P={}; players().forEach(p=>P[p.peer]=pres(p)); return P }
+function hostTick(force){
+  if(!R||!myPeer) return;
+  const G=currentG(); if(!G||G.h!==myPeer) return;
+  const g=clone(G), P=snapshotP(), present=Object.keys(P);
+  if(g.ph==="lobby"){
+    g.ord=players().sort((a,b)=>(pres(a).t||0)-(pres(b).t||0)).map(p=>p.peer);
+    g.nm={}; g.ord.forEach(x=>g.nm[x]=String(P[x].n).slice(0,18));
+  } else {
+    g.ord.forEach(x=>{ if(P[x]) g.nm[x]=String(P[x].n).slice(0,18) });
+    const wasJudge=g.jd;
+    g.ord=g.ord.filter(x=>present.includes(x));
+    for(const x of Object.keys(g.hd)) if(!P[x]) delete g.hd[x];
+    for(const x of Object.keys(g.sc)) if(!P[x]) delete g.sc[x];
+    if(g.ord.length<2){ Object.assign(g,{ph:"lobby",subs:[],win:[],tv:null}); }
+    else if(g.mode==="j"&&(g.ph==="play"||g.ph==="judge")&&!present.includes(wasJudge)){ g.ji=Math.max(-1,(g.ji??0)-1); nextRound(g,P); }
+    if(g.ph==="play"){
+      const need=g.ord.filter(x=>!(g.mode==="j"&&x===g.jd));
+      const done=need.filter(x=>{const s=P[x].s;return s&&s.r===g.r&&g.hd[x]&&g.hd[x].includes(s.c)});
+      if(done.length===need.length||(force==="reveal"&&done.length>=1)) reveal(g,P,done);
+    } else if(g.ph==="judge"){
+      const v=P[g.jd]&&P[g.jd].v; if(v&&v.r===g.r&&g.subs[v.i]) finishRound(g,[v.i]);
+    } else if(g.ph==="vote"){
+      const ok=g.ord.filter(x=>validVote(g,P[x].v,x));
+      if(ok.length===g.ord.length||(force==="tally"&&ok.length>=1)) tally(g,P);
+    }
+  }
+  if(force==="next"&&g.ph==="result") nextRound(g,P);
+  if(force==="start"&&g.ph==="lobby"&&g.ord.length>=2){
+    Object.assign(g,{seed:Math.floor(Math.random()*1e9),dp:0,pp:0,r:0,ji:-1,hd:{},sc:{},subs:[]});
+    g.ord.forEach(x=>{g.sc[x]=0;deal(g,x)}); nextRound(g,P);
+  }
+  if(force==="again"&&g.ph==="over"){ Object.assign(g,{ph:"lobby",subs:[],win:[],tv:null,hd:{},sc:{}}); }
+  if(force&&typeof force==="object") Object.assign(g,force);
+  if(JSON.stringify(g)!==JSON.stringify(myPres.g)) { myPres.g=g; R.presence({g}).catch(e=>{ if(e&&e.code==="invalid_argument") toast("البيانات كبيرة، جرّب أسماء أقصر"); }); }
+}
+
+/* ===== العرض ===== */
+const app=$("#app"), dock=$("#dock");
+function myName(){ return lsGet("afeh-name") || "لاعب" }
+function marquee(){ return `<header class="marquee"><div class="bulbs" aria-hidden="true">${"<i></i>".repeat(9)}</div><h1>إفيه على الموقف</h1><p>الموقف على الترابيزة.. نزّل أنسب إفيه عندك</p></header>` }
+function renderHome(){
+  dock.hidden=true;
+  const can=roomReady&&!roomFailed;
+  app.innerHTML=`${marquee()}
+  <section class="panel">
+    <label for="nm">اسمك</label>
+    <input id="nm" maxlength="16" placeholder="مثلاً: زيزو" value="${esc(lsGet("afeh-name"))}">
+    <button class="btn" data-act="create" ${can?"":"disabled"}>اعمل أوضة جديدة</button>
+    <div class="or">أو ادخل أوضة صاحبك</div>
+    <div class="row">
+      <input id="cd" maxlength="4" placeholder="الكود" value="${esc(urlCode())}" style="text-transform:uppercase;direction:ltr;text-align:center;letter-spacing:6px">
+      <button class="btn ${urlCode()?"":"ghost"}" data-act="join" ${can?"":"disabled"}>ادخل</button>
+    </div>
+    ${roomFailed?`<div class="warn">مقدرناش نحمّل الاتصال. اتأكد إن النت شغال واعمل ريفريش للصفحة.</div>`:""}
+  </section>
+  <section class="panel">
+    <h2 class="display" style="font-size:24px;color:var(--mustard)">بتتلعب إزاي؟</h2>
+    <p class="note">كل جولة بيظهر كارت موقف. كل واحد بينزّل من كروته أنسب إفيه. الحكم (أو تصويت الكل) بيختار الأضحك، وصاحبه ياخد نقطة. أول واحد يوصل للنقط المطلوبة يكسب.</p>
+    <p class="note">من 2 لـ 8 لاعبين، كل واحد من موبايله. اعمل أوضة وابعت اللينك لصحابك على واتساب.</p>
+  </section>`;
+}
+function urlCode(){ try{ const c=(new URLSearchParams(location.search).get("r")||"").toUpperCase(); return /^[A-Z]{4}$/.test(c)?c:"" }catch(e){ return "" } }
+function hdr(g){
+  const me=g&&g.sc&&myPeer in g.sc?g.sc[myPeer]:null;
+  return `<div class="top">
+    <div class="code"><span>كود الأوضة</span><b>${esc(code)}</b><button class="btn ghost small" data-act="copy">ابعت اللينك</button></div>
+    ${connected?"":`<span class="pill" style="color:#f3d48a">بيوصّل...</span>`}
+    <div class="meta">${g&&g.r&&g.ph!=="lobby"?`<span class="pill">جولة ${g.r}</span>`:""}${me!==null&&g.ph!=="lobby"?`<span class="pill">نقطك: ${me}</span>`:""}<button class="btn ghost small" data-act="leave">اخرج</button></div>
+  </div>`;
+}
+function promptCard(g){ return `<div class="prompt"><div class="tag">الموقف</div><div class="display">${esc(PROMPTS[g.pr])}</div><div class="tick">أول واحد يوصل ${g.goal} يكسب</div></div>` }
+function nameOf(g,x){ return x==="*"?"الكارت العشوائي":esc((g.nm&&g.nm[x])||"لاعب") }
+function scores(g){
+  const list=[...g.ord].sort((a,b)=>(g.sc[b]||0)-(g.sc[a]||0));
+  return `<section class="panel"><h2 class="display" style="font-size:22px">النتيجة</h2><ul class="players">${list.map(x=>`<li><span class="nm">${nameOf(g,x)}${x===myPeer?`<span class="badge you">إنت</span>`:""}${g.mode==="j"&&x===g.jd&&(g.ph==="play"||g.ph==="judge")?`<span class="badge">الحكم</span>`:""}</span><span class="sc">${g.sc[x]||0}</span></li>`).join("")}</ul></section>`;
+}
+function setDock(html){ if(html){dock.innerHTML=html;dock.hidden=false}else dock.hidden=true }
+
+function render(){
+  if(screen!=="game") return;
+  const g=currentG();
+  if(!g){ app.innerHTML=`${hdr(null)}<div class="spinner" role="status" aria-label="بنحمّل"></div><p class="status">بنفتح الأوضة... ابعت الكود ده لصحابك</p>`; setDock(""); return; }
+  const host=g.h===myPeer, inGame=g.ord.includes(myPeer);
+  let h=hdr(g), d="";
+  if(g.ph==="lobby"){
+    const ps=players();
+    h+=`<section class="panel"><h2 class="display" style="font-size:26px">مستنيين اللاعبين (${ps.length}/8)</h2>
+      <ul class="players">${ps.map(p=>`<li><span class="nm">${esc(pres(p).n)}${p.sameTab?`<span class="badge you">إنت</span>`:""}${p.peer===g.h?`<span class="badge">صاحب الأوضة</span>`:""}</span></li>`).join("")}</ul></section>`;
+    if(host){
+      h+=`<section class="panel"><label>مين بيختار الكارت الكسبان؟</label>
+        <div class="seg"><button class="${g.mode==="j"?"on":""}" data-act="mode" data-v="j">حكم بيتغير كل جولة</button><button class="${g.mode==="v"?"on":""}" data-act="mode" data-v="v">الكل بيصوّت</button></div>
+        <label>نلعب لحد كام نقطة؟</label>
+        <div class="seg">${[3,5,7,10].map(n=>`<button class="${g.goal===n?"on":""}" data-act="goal" data-v="${n}">${n}</button>`).join("")}</div></section>`;
+      d=`<button class="btn" data-act="start" ${ps.length>=2&&ps.length<=8?"":"disabled"}>${ps.length<2?"محتاجين لاعب كمان على الأقل":ps.length>8?"الحد الأقصى 8 لاعبين":"يلا نبدأ"}</button>`;
+    } else h+=`<p class="status">${nameOf(g,g.h)} هيبدأ اللعبة أول ما الكل يدخل</p>`;
+  }
+  else if(!inGame){
+    h+=promptCard(g)+`<p class="status big">هتدخل من الجولة الجاية</p>`+scores(g);
+  }
+  else if(g.ph==="play"){
+    h+=promptCard(g);
+    const need=g.ord.filter(x=>!(g.mode==="j"&&x===g.jd));
+    const done=need.filter(x=>{const s=(presOf(x)||{}).s;return s&&s.r===g.r});
+    const prog=`(${done.length}/${need.length})`;
+    if(g.mode==="j"&&g.jd===myPeer){
+      h+=`<p class="status big">إنت الحكم الجولة دي</p><p class="status">مستني الكروت تنزل ${prog}</p>`;
+    } else if(myPres.s&&myPres.s.r===g.r){
+      h+=`<div class="hand"><div class="card sel">${esc(ANSWERS[myPres.s.c])}<small>نزّلته</small></div></div><p class="status">مستنيين الباقي ${prog}</p>`;
+    } else {
+      const hand=g.hd[myPeer]||[];
+      if(sel!==null&&!hand.includes(sel)) sel=null;
+      h+=`<p class="status">اختار أنسب إفيه من كروتك</p><div class="hand">${hand.map(c=>`<button class="card ${sel===c?"sel":""}" data-act="sel" data-v="${c}" aria-pressed="${sel===c}">${esc(ANSWERS[c])}</button>`).join("")}</div>`;
+      d=`<button class="btn" data-act="submit" ${sel===null?"disabled":""}>${sel===null?"اختار كارت":"نزّل الكارت"}</button>`;
+    }
+    if(host&&done.length>=1&&done.length<need.length) h+=`<button class="btn ghost small" data-act="force" data-v="reveal">كمّل من غير المتأخرين</button>`;
+  }
+  else if(g.ph==="judge"||g.ph==="vote"){
+    h+=promptCard(g);
+    const judging=g.ph==="judge", iJudge=judging&&g.jd===myPeer, iVote=!judging;
+    const myVote=myPres.v&&myPres.v.r===g.r?myPres.v.i:null;
+    if(pick!==null&&!g.subs[pick]) pick=null;
+    if(judging) h+=`<p class="status ${iJudge?"big":""}">${iJudge?"اختار الأضحك":`${nameOf(g,g.jd)} بيختار الأضحك...`}</p>`;
+    else{ const vd=g.ord.filter(x=>{const v=(presOf(x)||{}).v;return validVote(g,v,x)}).length;
+      h+=`<p class="status">${myVote!==null?`صوّتّ! مستنيين الباقي (${vd}/${g.ord.length})`:"صوّت للإفيه الأضحك (مش كارتك)"}</p>`; }
+    h+=`<div class="hand">${g.subs.map(([x,c],i)=>{
+      const mine=x===myPeer, chosen=(iJudge&&pick===i)||(iVote&&(pick===i||(pick===null&&myVote===i)));
+      const clickable=iJudge||(iVote&&!mine);
+      return `<button class="card ${chosen?"sel":""} ${mine?"mine":""}" ${clickable?`data-act="pick" data-v="${i}"`:"disabled"}>${esc(ANSWERS[c])}${mine?`<small>كارتك</small>`:""}</button>`}).join("")}</div>`;
+    if(iJudge) d=`<button class="btn" data-act="judge" ${pick===null?"disabled":""}>${pick===null?"اختار كارت":"ده الكسبان"}</button>`;
+    if(iVote&&pick!==null&&pick!==myVote) d=`<button class="btn" data-act="vote">صوّت للكارت ده</button>`;
+    if(host&&!judging){ const vd=g.ord.filter(x=>validVote(g,(presOf(x)||{}).v,x)).length; if(vd>=1&&vd<g.ord.length) h+=`<button class="btn ghost small" data-act="force" data-v="tally">اقفل التصويت</button>`; }
+  }
+  else if(g.ph==="result"||g.ph==="over"){
+    h+=promptCard(g);
+    const winners=g.win.map(i=>g.subs[i][0]);
+    let line;
+    if(!winners.length) line="محدش خد صوت الجولة دي";
+    else if(winners.every(x=>x==="*")) line="الكارت العشوائي كسب! محدش خد نقطة";
+    else line=`النقطة راحت لـ ${winners.filter(x=>x!=="*").map(x=>nameOf(g,x)).join(" و ")}`;
+    if(g.ph==="over"){
+      const top=Math.max(...Object.values(g.sc)); const champs=g.ord.filter(x=>g.sc[x]===top);
+      h+=`<div class="champ"><div class="note">والكسبان...</div><div class="display">${champs.map(x=>nameOf(g,x)).join(" و ")}</div><div class="note">ملك الإفيهات بـ ${top} نقط</div></div>`;
+      if(host) d=`<button class="btn" data-act="force" data-v="again">لعبة جديدة</button>`;
+    } else {
+      h+=`<p class="status big">${line}</p>`;
+      if(host) d=`<button class="btn" data-act="force" data-v="next">الجولة الجاية</button>`;
+      else h+=`<p class="status">${nameOf(g,g.h)} هيبدأ الجولة الجاية</p>`;
+    }
+    h+=`<div class="hand">${g.subs.map(([x,c],i)=>`<div class="card ${g.win.includes(i)?"win":""}">${esc(ANSWERS[c])}<span class="who">${nameOf(g,x)}${g.tv?` · <span class="votes">${g.tv[i]}</span> صوت`:""}</span></div>`).join("")}</div>`;
+  }
+  if(g.ph!=="lobby") h+=scores(g);
+  app.innerHTML=h; setDock(d);
+}
+
+/* ===== الأزرار ===== */
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-act]"); if(!b||b.disabled) return;
+  const act=b.dataset.act, v=b.dataset.v;
+  if(act==="create"||act==="join"){
+    const n=($("#nm").value||"").trim().slice(0,16);
+    if(!n){ toast("اكتب اسمك الأول"); $("#nm").focus(); return; }
+    lsSet("afeh-name",n);
+    if(act==="create") return enterRoom(newCode(),true);
+    const c=($("#cd").value||"").trim().toUpperCase();
+    if(!/^[A-Z]{4}$/.test(c)){ toast("الكود 4 حروف إنجليزي"); $("#cd").focus(); return; }
+    return enterRoom(c,false);
+  }
+  if(act==="leave") return leaveRoom();
+  if(act==="copy"){
+    const link=shareLink(), msg="تعالى العب معانا «إفيه على الموقف» 😂\n"+link;
+    if(navigator.share){ navigator.share({title:"إفيه على الموقف",text:msg}).catch(()=>{}); return; }
+    try{ navigator.clipboard.writeText(link).then(()=>toast("اللينك اتنسخ"),()=>toast("الكود: "+code)) }catch(_){ toast("الكود: "+code) }
+    return;
+  }
+  const g=currentG(); if(!g) return;
+  if(act==="mode"&&isHost()) return hostTick({mode:v}), render();
+  if(act==="goal"&&isHost()) return hostTick({goal:+v}), render();
+  if(act==="start"&&isHost()) return hostTick("start"), render();
+  if(act==="force"&&isHost()) return hostTick(v), render();
+  if(act==="sel"){ sel=+v; return render(); }
+  if(act==="submit"&&sel!==null){ setP({s:{r:g.r,c:sel}}); sel=null; return; }
+  if(act==="pick"){ pick=+v; return render(); }
+  if(act==="judge"&&pick!==null){ setP({v:{r:g.r,i:pick}}); pick=null; return; }
+  if(act==="vote"&&pick!==null){ setP({v:{r:g.r,i:pick}}); pick=null; return; }
+});
+document.addEventListener("keydown",e=>{ if(e.key==="Enter"&&e.target.id==="cd") document.querySelector('[data-act="join"]')?.click(); });
+
+renderHome();
+</script>
+</body>
+</html>
